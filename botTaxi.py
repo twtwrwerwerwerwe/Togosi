@@ -1,0 +1,145 @@
+import re
+import asyncio
+from telethon import TelegramClient, events
+from telethon.tl.types import PeerChannel, PeerChat
+
+# =================== TELEGRAM API ===================
+api_id = 33582093
+api_hash = '6cd2d0a3533daf2ad4f55511e9039d1f'
+
+client = TelegramClient('taxi_session', api_id, api_hash)
+
+# =================== TARGET CHAT LINKLAR ===================
+# username yoki https://t.me/xxx ko‘rinishida bo‘lishi mumkin
+TARGET_CHATS = [
+    "https://t.me/+78nW1s81Gtw0MGVi"
+]
+
+# =================== KALIT SO‘ZLAR ===================
+KEYWORDS = [
+    # odam bor
+    'odam bor','odambor','odam bor ekan'
+    'bitta odam bor','ikkita odam bor','uchta odam bor',"to'rtta odam bor",'tortta odam bor',
+    '1ta odam bor','2ta odam bor','3ta odam bor','4ta odam bor',
+    'odam bor 1','odam bor 2','odam bor 3','odam bor 4',
+    'rishtonga odam bor','toshkentga odam bor',"toshkendan farg'onaga odam bor",
+    
+    # mashina kerak
+    'mashina kerak',
+
+    # pochta bor
+    'pochta bor','pochta kerak','pochta ketadi','pochta olib ketadi','pochta bormi',
+
+    # ketadi
+    'ketadi','ketvotti','ketishi kerak',
+
+    # dostavka
+    'dastavka bor','dostavka bor','dastafka','dastafka bor',
+    "Toshkentdan Rishtonga 1odam bor", '1odam bor', '1ta kamla', 'bitta kamlarga', '1ta kamlarga',
+    '1 ta kamlarga', '2kiwimiz', "bagajga yuk bor", '2kishimiz', "2 kiwimiz", "2 kishimiz", "2kiwimiz", 
+    "3kiwimiz", "3 kiwimiz", "3 kishimiz", "3kishimiz", "4kishimiz", "4kiwimiz", "4 kishimiz", "4 kiwimiz",
+    "Toshkentga 1kishi", "Toshkenga 1kishi", "Rishtonga 1kishi", "Rishotondan 1kiwi", "poshta  bor", "moshina kerak",
+    "ayollar bor mashina kerak", "ayollar bor moshina kerak", "Toshkentga 1ta odam bor", "4 kishimiz", "4 кишимиз",
+    'комплек одам бор','комплект одам бор','компилек одам бор','кампилек одам бор',
+
+    'риштонга одам бор','тошкентга одам бор','тошкентдан фарғонага одам бор','тошкентга 1 киши','риштонга 1 киши','фарғонага 1 киши','1 киши бор','2 киши бор','3 киши бор','4 киши бор',
+    'чирчиқдан 1 киши', 'янгийўлдан 1 киши', 'зангиотадан 1 киши', 'қибрайдан 1 киши',
+
+    '1 та қиз бор', '1 та қиз бола бор', 'қиз бола бор', 'аёл киши бор машина сўрашяпти', 'аёллар бор машина керак',
+
+    # mashina
+    'машина керак', 'машина кере', 'машина керeк', 'багажли машина керак', 'машина излаяпман', 'мошина керак',
+
+    # pochta / dostavka
+    'почта бор', 'почта керак', 'почта олиб кетади', 'пошта бор', 'даставка бор', 'доставка бор',
+
+    # ketadi
+    'кетади', 'кетвотти', 'кетиши керак', "shopir kerak",
+    'одам бор экан','одам бор эди','битта одам бор','иккита одам бор','учта одам бор','тўртта одам бор','1та одам бор','2та одам бор','3та одам бор','4та одам бор','одам бор 1','одам бор 2','одам бор 3','одам бор 4',
+]
+
+KEYWORDS_RE = re.compile("|".join(re.escape(k) for k in KEYWORDS), re.IGNORECASE)
+
+# =================== TELEFON REGEX ===================
+PHONE_RE = re.compile(r'(\+?998[\d\-\s\(\)]{9,15}|9\d{8})')
+
+def normalize_phone(raw):
+    digits = re.sub(r'\D', '', raw)
+    if digits.startswith('998') and len(digits) >= 12:
+        return '+' + digits[:12]
+    if len(digits) == 9:
+        return '+998' + digits
+    return None
+
+# =================== HANDLER ===================
+@client.on(events.NewMessage(incoming=True))
+async def handler(event):
+    try:
+        if not isinstance(event.peer_id, (PeerChannel, PeerChat)):
+            return
+
+        text = event.raw_text
+        if not text or not KEYWORDS_RE.search(text):
+            return
+
+        chat, sender = await asyncio.gather(
+            event.get_chat(),
+            event.get_sender()
+        )
+
+        # =================== GURUH ===================
+        group_name = getattr(chat, 'title', 'Nomaʼlum guruh')
+        if getattr(chat, 'username', None):
+            group_link = f"https://t.me/{chat.username}/{event.id}"
+            group_display = f"<a href='{group_link}'>{group_name}</a>"
+        else:
+            group_display = group_name
+
+        # =================== EGASI ===================
+        username = getattr(sender, 'username', None)
+        owner_display = f"@{username}" if username else "Berkitilgan"
+
+        # =================== PROFIL LINK ===================
+        sender_id = getattr(sender, 'id', None)
+        profile_link = (
+            f"<a href='tg://user?id={sender_id}'>Profilga o‘tish</a>"
+            if sender_id else "Berkitilgan"
+        )
+
+        # =================== TELEFON ===================
+        phone = getattr(sender, 'phone', None)
+        phone = normalize_phone(phone) if phone else None
+
+        if not phone:
+            for m in PHONE_RE.finditer(text):
+                phone = normalize_phone(m.group(0))
+                if phone:
+                    break
+
+        phone_display = phone if phone else "Berkitilgan"
+
+        # =================== YUBORILADIGAN XABAR ===================
+        message_text = (
+            f"🚖 <b>Yangi e’lon!</b>\n\n"
+            f"📝 <b>Matn:</b>\n{text}\n\n"
+            f"📍 <b>Guruh:</b> {group_display}\n\n"
+            f"👤 <b>Egasi:</b> {owner_display}\n\n"
+            f"📞 <b>Telefon:</b> {phone_display}\n\n"
+            f"🔗 <b>Profil:</b> {profile_link}"
+        )
+
+        # =================== 30 SEKUND KUTISH ===================
+        await asyncio.sleep(3)
+
+        # =================== YUBORISH ===================
+        for target in TARGET_CHATS:
+            await client.send_message(target, message_text, parse_mode='html')
+            print(f"📨 3 soniyadan keyin yuborildi → {target}")
+
+    except Exception as e:
+        print("❌ Xatolik:", e)
+
+# =================== START ===================
+print("🚕 Taxi bot ishga tushdi...")
+client.start()
+client.run_until_disconnected()
