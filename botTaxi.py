@@ -129,12 +129,12 @@ async def handler(event):
         )
 
         # =================== 30 SEKUND KUTISH ===================
-        await asyncio.sleep(3)
+        await asyncio.sleep(1)
 
         # =================== YUBORISH ===================
         for target in TARGET_CHATS:
             await client.send_message(target, message_text, parse_mode='html')
-            print(f"📨 3 soniyadan keyin yuborildi → {target}")
+            print(f"📨 1 soniyadan keyin yuborildi → {target}")
 
     except Exception as e:
         print("❌ Xatolik:", e)
